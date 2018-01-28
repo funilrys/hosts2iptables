@@ -2,9 +2,6 @@
 
 
 ################################# Default Values ###############################
-# This is me and always me :-)
-funilrys='funilrys'
-
 # This is the current version of this script.
 versionNumber='1.0.0'
 ################################################################################
@@ -94,30 +91,30 @@ else
     then
         # This initiate the input file
         input="${1}"
-
-
+        
+        
         if [[ ${2} != '' ]]
         then
             # We check if there is a fixed output. If it's not we save the
             # output to ${PWD}iptables.rules
             outputFile="${2}"
         fi
-
+        
         # We read our file to an array.
         readarray fileContent < ${input}
-
+        
         # We reset the iptables.
         reset_iptables
-
+        
         # We set the iptable base.
         set_iptables_base
-
+        
         for i in ${!fileContent[*]}
         do
             # We go through the array and initate the domain we are going to add
             # to IPTABLES.
             readedLine="$(echo "${fileContent[${i}]}" |cut -d $'\n' -f1)"
-
+            
             case "${readedLine}" in
                 \#*|"\n"|"")
                     # If it's a commented line, we continue to the next line.
@@ -125,7 +122,7 @@ else
                 ;;
                 *)
                     domain="$(echo ${readedLine##* })"
-
+                    
                     case "${domain}" in
                         localhost|localhost.localdomain|local|broadcasthost|0.0.0.0)
                             # If the domain is into that list we also continue
@@ -135,11 +132,11 @@ else
                     esac
                 ;;
             esac
-
+            
             # We set out rule
             ${iptables} -A OUTPUT -d "${domain}" -j DROP > /dev/null 2>&1
         done
-
+        
         # We save the rules into the fixed or desired output.
         ${iptables_save} > ${outputFile}
     else
