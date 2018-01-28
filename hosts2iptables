@@ -1,0 +1,149 @@
+#!/usr/bin/bash
+
+
+################################# Default Values ###############################
+# This is me and always me :-)
+funilrys='funilrys'
+
+# This is the current version of this script.
+versionNumber='1.0.0'
+################################################################################
+##################################### Paths ####################################
+# This is the current directory path.
+# DO NOT FORGET '/' AT THE END
+currentDir=${PWD}/
+
+# This is the default outputed file.
+outputFile=${currentDir}iptables.rules
+
+# This is the path to the iptables command.
+iptables=$(which iptables)
+
+# This is the path to the iptables-save command.
+iptables_save=$(which iptables-save)
+################################################################################
+
+################################## Usage #######################################
+# Help function
+#
+# @CalledBy *
+################################################################################
+usage(){
+    echo "Usage: ${0} [ INPUT ] [ OUTPUT ]"
+    echo ""
+    echo "  --version                  -v              Show the current version of hosts2iptables."
+    echo ""
+}
+
+################################ Reset IPTABLES ################################
+# Reset iptables to Default
+#
+# Thanks to: https://wiki.archlinux.org/index.php/Iptables#Resetting_rules
+#
+# @CalledBy *
+################################################################################
+reset_iptables(){
+    ${iptables} -F
+    ${iptables} -X
+    ${iptables} -t nat -F
+    ${iptables} -t nat -X
+    ${iptables} -t mangle -F
+    ${iptables} -t mangle -X
+    ${iptables} -t raw -F
+    ${iptables} -t raw -X
+    ${iptables} -t security -F
+    ${iptables} -t security -X
+    ${iptables} -P INPUT ACCEPT
+    ${iptables} -P FORWARD ACCEPT
+    ${iptables} -P OUTPUT ACCEPT
+}
+
+############################# Set IPTABLES BASE ################################
+# Set some basic rules before we start to convert out hosts
+#
+# @CalledBy *
+################################################################################
+set_iptables_base(){
+    ${iptables} -N TCP
+    ${iptables} -N UDP
+    ${iptables} -P FORWARD DROP
+    ${iptables} -P OUTPUT ACCEPT
+    ${iptables} -P INPUT DROP
+    ${iptables} -A INPUT -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+    ${iptables} -A INPUT -i lo -j ACCEPT
+    ${iptables} -A INPUT -m conntrack --ctstate INVALID -j DROP
+    ${iptables} -A INPUT -p icmp --icmp-type 8 -m conntrack --ctstate NEW -j ACCEPT
+    ${iptables} -A INPUT -p udp -m conntrack --ctstate NEW -j UDP
+    ${iptables} -A INPUT -p tcp --syn -m conntrack --ctstate NEW -j TCP
+    ${iptables} -A INPUT -p udp -j REJECT --reject-with icmp-port-unreachable
+    ${iptables} -A INPUT -p udp -j REJECT --reject-with icmp-port-unreachable
+    ${iptables} -A INPUT -j REJECT --reject-with icmp-proto-unreachable
+}
+
+if [[ $(id -u -n) != "root" ]]
+then
+    # The script must me run as root.
+    echo "Please run this script as root"
+    exit 1
+else
+    if [[ ${1} == '--version' || ${1} == '-v' ]]
+    then
+        # Return the version number.
+        echo ${0} ${versionNumber}
+    elif [[ ${1} != '' ]]
+    then
+        # This initiate the input file
+        input="${1}"
+
+
+        if [[ ${2} != '' ]]
+        then
+            # We check if there is a fixed output. If it's not we save the
+            # output to ${PWD}iptables.rules
+            outputFile="${2}"
+        fi
+
+        # We read our file to an array.
+        readarray fileContent < ${input}
+
+        # We reset the iptables.
+        reset_iptables
+
+        # We set the iptable base.
+        set_iptables_base
+
+        for i in ${!fileContent[*]}
+        do
+            # We go through the array and initate the domain we are going to add
+            # to IPTABLES.
+            readedLine="$(echo "${fileContent[${i}]}" |cut -d $'\n' -f1)"
+
+            case "${readedLine}" in
+                \#*|"\n"|"")
+                    # If it's a commented line, we continue to the next line.
+                    continue
+                ;;
+                *)
+                    domain="$(echo ${readedLine##* })"
+
+                    case "${domain}" in
+                        localhost|localhost.localdomain|local|broadcasthost|0.0.0.0)
+                            # If the domain is into that list we also continue
+                            # to the next line.
+                            continue
+                        ;;
+                    esac
+                ;;
+            esac
+
+            # We set out rule
+            ${iptables} -A OUTPUT -d "${domain}" -j DROP > /dev/null 2>&1
+        done
+
+        # We save the rules into the fixed or desired output.
+        ${iptables_save} > ${outputFile}
+    else
+        # We return the usage.
+        usage
+    fi
+fi
