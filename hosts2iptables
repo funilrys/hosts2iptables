@@ -3,7 +3,7 @@
 
 ################################# Default Values ###############################
 # This is the current version of this script.
-versionNumber='1.0.0'
+versionNumber='1.0.1'
 ################################################################################
 ##################################### Paths ####################################
 # This is the current directory path.
@@ -79,7 +79,7 @@ set_iptables_base(){
 
 if [[ $(id -u -n) != "root" ]]
 then
-    # The script must me run as root.
+    # The script must be run as root.
     echo "Please run this script as root"
     exit 1
 else
@@ -111,7 +111,7 @@ else
         
         for i in ${!fileContent[*]}
         do
-            # We go through the array and initate the domain we are going to add
+            # We go through the array and initate the domains we are going to add
             # to IPTABLES.
             readedLine="$(echo "${fileContent[${i}]}" |cut -d $'\n' -f1)"
             
